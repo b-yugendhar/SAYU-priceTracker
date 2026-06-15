@@ -1,802 +1,215 @@
+import os
+import logging
+import io, csv
+from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, Response
+from flask_login import LoginManager, login_required, current_user
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
-from flask import Flask, request, jsonify, render_template, redirect, url_for
-import requests
-from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from webdriver_manager.chrome import ChromeDriverManager
-from requests_html import HTMLSession
-import smtplib
-import time
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
-import requests
-from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from requests_html import HTMLSession
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-import smtplib
-import time
-import sqlite3
-import re
+from config import Config
+from db import db, init_db
+from models import User, TrackedItem, PriceHistory
+from auth import auth_bp
+from scrapers import scrape_product
+from scheduler import start_scheduler
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+app.config.from_object(Config)
+
+# Configure API Rate Limiter
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+
+# Register Blueprints
+app.register_blueprint(auth_bp)
+
+# Configure Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'auth.login'
+login_manager.login_message_category = 'error'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+# --- Routing ---
 
-
-# Function to connect to the database
-def connect_db():
-    return sqlite3.connect("D:/database/databse.db")
-#create table
-
-def create_table():
-    with connect_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS Sayu (
-                SayuID INTEGER PRIMARY KEY AUTOINCREMENT,
-                Email TEXT NOT NULL,
-                AlertPrice REAL NOT NULL CHECK(AlertPrice > 0),
-                URL TEXT NOT NULL,
-                ProductName TEXT
-            )
-        ''')
-        conn.commit()
-
-
-create_table()
-# --- Chrome Options Setup (Common for Selenium scrapers) ---
-
-def get_chrome_options():
-    chrome_options = Options()
-    # Standard options
-    chrome_options.add_argument("--headless=new") # Use new headless mode
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--window-size=1920,1080")
-    # Anti-detection options
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    chrome_options.add_experimental_option('useAutomationExtension', False)
-    # Set language to English to potentially stabilize element text/selectors
-    chrome_options.add_experimental_option('prefs', {'intl.accept_languages': 'en,en_US'})
-    chrome_options.add_argument('--lang=en-US')
-    # Common user agent
-    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
-    return chrome_options
-
-# Scraper for Myntra
-# --- Scraper for Myntra (using Selenium - updated wait logic slightly) ---
-def scrape_myntra(url):
-    chrome_options = get_chrome_options()
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    product_data = { "name": None, "price": None, "rating": None, "details": None, "image_url": None }
-    wait = WebDriverWait(driver, 30)
-
-    try:
-        driver.get(url)
-        print(f"Attempting to scrape Myntra URL: {url}")
-
-        # Scrape Name
-        try:
-            name_selector = (By.CSS_SELECTOR, ".pdp-title, .pdp-name")
-            print(f"Myntra Scraper: Trying Name Selector: '.pdp-title, .pdp-name'")
-            name_element = wait.until(EC.visibility_of_element_located(name_selector))
-            
-            # Try finding Brand separately
-            brand = ""
-            try:
-                brand_element = driver.find_element(By.CSS_SELECTOR, ".pdp-title-brand, h1.pdp-name + h1, .brand-name")
-                brand = brand_element.text.strip() + " "
-            except NoSuchElementException:
-                print("Myntra Scraper: Could not find brand element.")
-
-            product_data["name"] = (brand + name_element.text.strip()).strip()
-            print(f"Myntra Scraper: Found Name - {product_data['name']}")
-        except (TimeoutException, NoSuchElementException) as e:
-            print(f"Myntra Scraper: Name not found or timed out. Error: {e}")
-
-        # Scrape Price
-        price_text = None
-        price_selectors_tried = []
-        try:
-            price_selector = (By.CSS_SELECTOR, ".pdp-price strong, .pdp-mrp strong")
-            selector_str = "'.pdp-price strong, .pdp-mrp strong'"
-            price_selectors_tried.append(selector_str)
-            print(f"Myntra Scraper: Trying Price Selector: {selector_str}")
-            price_element = wait.until(EC.visibility_of_element_located(price_selector))
-            price_text = price_element.text
-            print(f"Myntra Scraper: Found Price (Method 1) - Text: '{price_text}'")
-        except (TimeoutException, NoSuchElementException) as e:
-            print(f"Myntra Scraper: Price attempt 1 failed. Error: {e}")
-
-        # Clean and convert price
-        if price_text:
-            price_cleaned = re.sub(r'[^\d.]', '', price_text)
-            price_match = re.search(r'\d+\.?\d*', price_cleaned)
-            if price_match:
-                try:
-                    product_data["price"] = float(price_match.group())
-                    print(f"Myntra Scraper: Extracted Price - {product_data['price']}")
-                except ValueError:
-                    print(f"Myntra Scraper: Could not convert price '{price_match.group()}' to float.")
-            else:
-                print(f"Myntra Scraper: Could not extract numeric price from text: '{price_cleaned}' (Original: '{price_text}')")
-        else:
-            print(f"Myntra Scraper: Price not found using attempted selectors: {price_selectors_tried}")
-
-        # Scrape Rating
-        rating_text = None
-        rating_selectors_tried = []
-        try:
-            rating_selector = (By.CSS_SELECTOR, ".index-overallRating")
-            selector_str = "'.index-overallRating'"
-            rating_selectors_tried.append(selector_str)
-            print(f"Myntra Scraper: Trying Rating Selector: {selector_str}")
-            rating_element = wait.until(EC.presence_of_element_located(rating_selector))
-            try:
-                rating_value_element = rating_element.find_element(By.CSS_SELECTOR, ".index-ratingsValue")
-                rating_text = rating_value_element.text.strip()
-            except NoSuchElementException:
-                rating_text = rating_element.text.strip()
-            print(f"Myntra Scraper: Found Rating (Method 1) - Text: '{rating_text}'")
-        except (TimeoutException, NoSuchElementException) as e:
-            print(f"Myntra Scraper: Rating not found or timed out. Error: {e}")
-
-        # Clean and convert rating
-        if rating_text:
-            rating_match = re.search(r'\d+\.?\d*', rating_text)
-            if rating_match:
-                try:
-                    product_data["rating"] = float(rating_match.group())
-                    print(f"Myntra Scraper: Extracted Rating - {product_data['rating']}")
-                except ValueError:
-                    print(f"Myntra Scraper: Could not convert rating '{rating_match.group()}' to float.")
-                    product_data["rating"] = "Not Available"
-            else:
-                print(f"Myntra Scraper: Could not extract numeric rating from text: '{rating_text}'")
-                product_data["rating"] = "Not Available"
-        else:
-            print(f"Myntra Scraper: Rating not found using attempted selectors: {rating_selectors_tried}")
-            product_data["rating"] = "Not Available"
-
-        # Scrape Details - UPDATED BASED ON PROVIDED HTML
-        product_data["details"] = []
-        details_dict = {}
-        
-        try:
-            # 1. Product Description
-            try:
-                desc_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".pdp-product-description-content")))
-                if desc_element.text.strip():
-                    details_dict["Product Description"] = desc_element.text.strip()
-                    print(f"Myntra Scraper: Found Product Description")
-            except (TimeoutException, NoSuchElementException) as e:
-                print(f"Myntra Scraper: Product Description not found. Error: {e}")
-            
-            # 2. Size & Fit
-            try:
-                size_fit_element = driver.find_element(By.CSS_SELECTOR, ".pdp-sizeFitDescContent")
-                if size_fit_element.text.strip():
-                    details_dict["Size & Fit"] = size_fit_element.text.strip()
-                    print(f"Myntra Scraper: Found Size & Fit")
-            except NoSuchElementException as e:
-                print(f"Myntra Scraper: Size & Fit not found. Error: {e}")
-            
-            # 3. Material & Care
-            try:
-                material_care_element = driver.find_elements(By.CSS_SELECTOR, ".pdp-sizeFitDescContent")
-                if len(material_care_element) > 1 and material_care_element[1].text.strip():
-                    details_dict["Material & Care"] = material_care_element[1].text.strip()
-                    print(f"Myntra Scraper: Found Material & Care")
-            except (IndexError, NoSuchElementException) as e:
-                print(f"Myntra Scraper: Material & Care not found. Error: {e}")
-            
-            # 4. Specifications Table
-            try:
-                spec_rows = driver.find_elements(By.CSS_SELECTOR, ".index-row")
-                specifications = {}
-                for row in spec_rows:
-                    try:
-                        key = row.find_element(By.CSS_SELECTOR, ".index-rowKey").text.strip()
-                        value = row.find_element(By.CSS_SELECTOR, ".index-rowValue").text.strip()
-                        if key and value:
-                            specifications[key] = value
-                    except NoSuchElementException:
-                        continue
-                
-                if specifications:
-                    details_dict["Specifications"] = specifications
-                    print(f"Myntra Scraper: Found {len(specifications)} Specifications")
-            except NoSuchElementException as e:
-                print(f"Myntra Scraper: Specifications table not found. Error: {e}")
-            
-            # Convert details_dict to a list format for consistency with other scrapers
-            for section, content in details_dict.items():
-                if isinstance(content, dict):
-                    # Handle specifications dictionary
-                    product_data["details"].append(f"{section}:")
-                    for key, value in content.items():
-                        product_data["details"].append(f"  - {key}: {value}")
-                else:
-                    # Handle text sections
-                    product_data["details"].append(f"{section}: {content}")
-            
-            print(f"Myntra Scraper: Found Details - {len(product_data['details'])} items")
-            if not product_data["details"]:
-                print("Myntra Scraper: Details not found or empty.")
-                
-        except Exception as e:
-            print(f"Myntra Scraper: Error extracting details. Error: {e}")
-            product_data["details"] = []
-
-        return product_data
-
-    except Exception as e:
-        if isinstance(e, WebDriverException):
-            print(f"Myntra Scraper Error: WebDriverException occurred: {e.msg}")
-        else:
-            print(f"Myntra Scraper Error: An unexpected error occurred: {e}")
-        try:
-            print(f"Page source at error (first 2000 chars):\n{driver.page_source[:2000]}")
-        except:
-            print("Could not retrieve page source after error.")
-        return None
-    finally:
-        if 'driver' in locals() and driver:
-            print("Myntra Scraper: Quitting driver.")
-            driver.quit()
-
-
-# --- Scraper for Amazon (using requests/BeautifulSoup - likely more stable) ---
-def scrape_amazon(url):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-        "Connection": "keep-alive",
-        "DNT": "1",
-        "Upgrade-Insecure-Requests": "1"
-    }
-
-    product_data = { "name": None, "price": None, "rating": None, "details": None, "image_url": None }
-
-    try:
-        response = requests.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.content, "html.parser")
-
-        # Name
-        name_element = soup.select_one("#productTitle")
-        if name_element:
-            product_data["name"] = name_element.text.strip()
-
-        # Price
-        price_element = soup.select_one("span.a-price-whole")
-        if not price_element:
-            price_element = soup.select_one("span.a-price .a-offscreen")
-        if price_element:
-            price_text = price_element.text.replace('₹', '').replace(',', '').strip()
-            price_match = re.search(r'\d+\.?\d*', price_text)
-            if price_match:
-                product_data["price"] = float(price_match.group())
-
-        # Rating
-        rating_element = soup.select_one("span[data-hook='rating-out-of-text']")
-        if not rating_element:
-            rating_element = soup.select_one("i.a-icon-star span.a-icon-alt")
-        if rating_element:
-            rating_text = rating_element.text.strip()
-            rating_match = re.search(r'\d+\.?\d*', rating_text)
-            if rating_match:
-                product_data["rating"] = float(rating_match.group())
-        else:
-            product_data["rating"] = "Not Available"
-
-        # Details
-        details_list = soup.select("#feature-bullets ul.a-unordered-list li span.a-list-item")
-        product_data["details"] = [item.text.strip() for item in details_list if item.text.strip()]
-
-        # ✅ Image
-        img_tag = soup.find("img", {"id": "landingImage"})
-        if img_tag:
-            product_data["image_url"] = img_tag.get("src")
-        else:
-            product_data["image_url"] = "Not Available"
-
-        return product_data
-
-    except requests.exceptions.RequestException as e:
-        print(f"Amazon Scraper Error: Request failed: {e}")
-        return None
-    except Exception as e:
-        print(f"Amazon Scraper Error: An unexpected error occurred: {e}")
-        return None
-
-    
-
-    
-# --- Updated Scraper for Ajio (using Selenium) ---
-def scrape_ajio(url):
-    chrome_options = get_chrome_options()
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    product_data = { "name": None, "price": None, "rating": None, "details": None, "image_url": None }
-
-    try:
-        driver.get(url)
-        wait = WebDriverWait(driver, 25) # Increased wait time significantly for Ajio
-
-        # Scrape Name
-        try:
-            name_element = wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "prod-name")))
-            product_data["name"] = name_element.text.strip()
-        except (TimeoutException, NoSuchElementException) as e:
-            print(f"Ajio Scraper: Name not found or timed out. Error: {e}")
-
-        # Scrape Price
-        try:
-            price_element = wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "prod-sp")))
-            price_text = price_element.text.replace('₹', '').replace(',', '').strip()
-            price_match = re.search(r'\d+\.?\d*', price_text)
-            if price_match:
-                product_data["price"] = float(price_match.group())
-        except (TimeoutException, NoSuchElementException) as e:
-            print(f"Ajio Scraper: Price not found or timed out. Error: {e}")
-
-        # Scrape Rating
-        try:
-            # Use XPath for potentially more stable targeting within the rating structure
-            # Wait for the container first
-            rating_container = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "rating-popup")))
-            # Then find the specific span with the rating number
-            rating_element = rating_container.find_element(By.XPATH, ".//span[contains(@class, '_3c5q0')]")
-            rating_text = rating_element.text.strip()
-            rating_match = re.search(r'\d+\.?\d*', rating_text) # Extract number
-            if rating_match:
-                product_data["rating"] = float(rating_match.group())
-        except (TimeoutException, NoSuchElementException) as e:
-            print(f"Ajio Scraper: Rating not found or timed out. Error: {e}")
-            product_data["rating"] = "Not Available"
-
-        # Scrape Details
-        try:
-            # Wait for the container of the details list
-            details_container = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "section.prod-desc ul.prod-list")))
-            # Find all 'li' elements with class 'detail-list' within that container
-            items = details_container.find_elements(By.CSS_SELECTOR, "li.detail-list")
-            # Filter out empty strings and potentially unwanted list items
-            details = [item.text.strip() for item in items if item.text.strip() and "About" not in item.text and "Product Code:" not in item.text]
-            product_data["details"] = details
-        except (TimeoutException, NoSuchElementException) as e:
-            print(f"Ajio Scraper: Details not found or timed out. Error: {e}")
-            product_data["details"] = []
-
-        return product_data
-
-    except Exception as e:
-        print(f"Ajio Scraper Error: An unexpected error occurred: {e}")
-        return None
-    finally:
-        driver.quit()
-
-
-# --- Updated Scraper for Flipkart (using Selenium) ---
-def scrape_flipkart(url):
-    chrome_options = get_chrome_options()
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    product_data = { "name": None, "price": None, "rating": None, "details": None, "image_url": None }
-
-    try:
-        driver.get(url)
-        wait = WebDriverWait(driver, 20) # Increased wait time
-
-        # Scrape Name
-        try:
-            # Use CSS Selector which might be more stable than just class name
-            name_element = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "span.VU-ZEz")))
-            product_data["name"] = name_element.text.strip()
-        except (TimeoutException, NoSuchElementException) as e:
-             print(f"Flipkart Scraper: Name not found or timed out. Error: {e}")
-             # Fallback attempt with potentially different selector if needed
-             try:
-                 name_element = driver.find_element(By.XPATH, "//h1/span[contains(@class, 'VU-ZEz')]") # Example XPATH
-                 product_data["name"] = name_element.text.strip()
-             except NoSuchElementException:
-                  print(f"Flipkart Scraper: Name fallback also failed.")
-
-
-        # Scrape Price
-        try:
-            price_element = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "div.Nx9bqj")))
-            price_text = price_element.text.replace('₹', '').replace(',', '').strip()
-            price_match = re.search(r'\d+\.?\d*', price_text)
-            if price_match:
-                product_data["price"] = float(price_match.group())
-        except (TimeoutException, NoSuchElementException) as e:
-            print(f"Flipkart Scraper: Price not found or timed out. Error: {e}")
-
-        # Scrape Rating
-        try:
-            # Wait specifically for the rating div
-            rating_element = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "div.XQDdHH")))
-            rating_text = rating_element.text.strip()
-            rating_match = re.search(r'\d+\.?\d*', rating_text) # Extract just the number
-            if rating_match:
-                product_data["rating"] = float(rating_match.group())
-        except (TimeoutException, NoSuchElementException) as e:
-            print(f"Flipkart Scraper: Rating not found or timed out. Error: {e}")
-            product_data["rating"] = "Not Available"
-
-        # Scrape Details (Highlights)
-        try:
-            # Wait for the container div first
-            details_container = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "xFVion")))
-            # Find list items within that container
-            items = details_container.find_elements(By.CSS_SELECTOR, "li._7eSDEz")
-            product_data["details"] = [item.text.strip() for item in items if item.text.strip()]
-        except (TimeoutException, NoSuchElementException) as e:
-            print(f"Flipkart Scraper: Details (Highlights) not found or timed out. Error: {e}")
-            # Fallback: Sometimes details are in a different structure
-            try:
-                 details_div = wait.until(EC.presence_of_element_located((By.CLASS_NAME, '_4gvKMe'))) # Look for description div
-                 items = details_div.find_elements(By.TAG_NAME, "p") # Paragraphs in description
-                 if items:
-                      product_data["details"] = [item.text.strip() for item in items if item.text.strip()]
-                 else: # Try another common pattern
-                      items = details_div.find_elements(By.CSS_SELECTOR, "div > ul > li")
-                      product_data["details"] = [item.text.strip() for item in items if item.text.strip()]
-
-            except (TimeoutException, NoSuchElementException) as e2:
-                  print(f"Flipkart Scraper: Details fallback also failed. Error: {e2}")
-                  product_data["details"] = []
-
-
-        #image scraping
-        try:
-            image_elem = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "img.DByuf4.IZexXJ.jLEJ7H")))
-            product_data["image_url"] = image_elem.get_attribute("src")
-        except:
-            print("Flipkart Scraper: Image URL not found.")
-            product_data["image_url"] = "Not Available"
-
-
-        return product_data
-
-    except Exception as e:
-        print(f"Flipkart Scraper Error: An unexpected error occurred: {e}")
-        return None
-    finally:
-        driver.quit()
-
-
-
-# --- Scraper for Meesho (using Selenium - review selectors if needed) ---
-def scrape_meesho(url):
-    chrome_options = get_chrome_options()
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    product_data = { "name": None, "price": None, "rating": None, "details": None, "image_url": None }
-    wait = WebDriverWait(driver, 30)
-
-    try:
-        driver.get(url)
-        print(f"Attempting to scrape Meesho URL: {url}")
-
-        # Scrape Name
-        try:
-            # First try to extract from the Product Details section
-            try:
-                details_container = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".ProductDescription__DetailsCardStyled-sc-1l1jg0i-0")))
-                name_p = details_container.find_element(By.XPATH, ".//p[contains(text(), 'Name')]")
-                if name_p:
-                    name_text = name_p.text.strip()
-                    # Extract the value part after "Name : "
-                    name_match = re.search(r'Name\s*:\s*(.*)', name_text)
-                    if name_match:
-                        product_data["name"] = name_match.group(1).strip()
-                        print(f"Meesho Scraper: Found Name from details - {product_data['name']}")
-            except (TimeoutException, NoSuchElementException) as e:
-                print(f"Meesho Scraper: Name not found in details section. Error: {e}")
-                
-            # If name not found in details, try the header
-            if not product_data["name"]:
-                name_selector = (By.CSS_SELECTOR, "span.fhfLdV, h1 span")
-                print(f"Meesho Scraper: Trying Name Selector: 'span.fhfLdV, h1 span'")
-                name_element = wait.until(EC.visibility_of_element_located(name_selector))
-                product_data["name"] = name_element.text.strip()
-                print(f"Meesho Scraper: Found Name from header - {product_data['name']}")
-        except (TimeoutException, NoSuchElementException) as e:
-            print(f"Meesho Scraper: Name not found or timed out. Error: {e}")
-
-        # Scrape Price
-        price_text = None
-        price_selectors_tried = []
-        try:
-            price_selector = (By.CSS_SELECTOR, "h4[class*='Price__StyledPrice']")
-            selector_str = "'h4[class*=Price__StyledPrice]'"
-            price_selectors_tried.append(selector_str)
-            print(f"Meesho Scraper: Trying Price Selector: {selector_str}")
-            price_element = wait.until(EC.visibility_of_element_located(price_selector))
-            price_text = price_element.text
-            print(f"Meesho Scraper: Found Price (Method 1) - Text: '{price_text}'")
-        except (TimeoutException, NoSuchElementException) as e:
-            print(f"Meesho Scraper: Price attempt 1 failed. Error: {e}")
-            try:
-                price_selector = (By.CSS_SELECTOR, "h4.biMVPh")
-                selector_str = "'h4.biMVPh'"
-                price_selectors_tried.append(selector_str)
-                print(f"Meesho Scraper: Trying Price Selector: {selector_str}")
-                price_element = wait.until(EC.visibility_of_element_located(price_selector))
-                price_text = price_element.text
-                print(f"Meesho Scraper: Found Price (Method 2) - Text: '{price_text}'")
-            except (TimeoutException, NoSuchElementException) as e2:
-                print(f"Meesho Scraper: Price attempt 2 failed. Error: {e2}")
-
-        # Clean and convert price
-        if price_text:
-            price_cleaned = re.sub(r'[^\d.]', '', price_text)
-            price_match = re.search(r'\d+\.?\d*', price_cleaned)
-            if price_match:
-                try:
-                    product_data["price"] = float(price_match.group())
-                    print(f"Meesho Scraper: Extracted Price - {product_data['price']}")
-                except ValueError:
-                    print(f"Meesho Scraper: Could not convert price '{price_match.group()}' to float.")
-            else:
-                print(f"Meesho Scraper: Could not extract numeric price from text: '{price_cleaned}' (Original: '{price_text}')")
-        else:
-            print(f"Meesho Scraper: Price not found using attempted selectors: {price_selectors_tried}")
-
-        # Scrape Rating
-        rating_text = None
-        rating_selectors_tried = []
-        try:
-            rating_container_selector = (By.CSS_SELECTOR, "div[class*='Rating__StyledRating']")
-            rating_value_selector = (By.TAG_NAME, "span")
-            selector_str = "Container: 'div[class*=Rating__StyledRating]', Value: 'span'"
-            rating_selectors_tried.append(selector_str)
-            print(f"Meesho Scraper: Trying Rating Selector: {selector_str}")
-            short_wait = WebDriverWait(driver, 7)
-            rating_element_container = short_wait.until(EC.visibility_of_element_located(rating_container_selector))
-            try:
-                rating_text_element = rating_element_container.find_element(rating_value_selector[0], rating_value_selector[1])
-                rating_text = rating_text_element.text.strip()
-            except NoSuchElementException:
-                rating_text = rating_element_container.text.strip()
-            print(f"Meesho Scraper: Found Rating (Method 1) - Text: '{rating_text}'")
-        except (TimeoutException, NoSuchElementException) as e:
-            print(f"Meesho Scraper: Rating not found or timed out. Error: {e}")
-
-        # Clean and convert rating
-        if rating_text:
-            rating_match = re.search(r'\d+\.?\d*', rating_text)
-            if rating_match:
-                try:
-                    product_data["rating"] = float(rating_match.group())
-                    print(f"Meesho Scraper: Extracted Rating - {product_data['rating']}")
-                except ValueError:
-                    print(f"Meesho Scraper: Could not convert rating '{rating_match.group()}' to float.")
-                    product_data["rating"] = "Not Available"
-            else:
-                print(f"Meesho Scraper: Could not extract numeric rating from text: '{rating_text}'")
-                product_data["rating"] = "Not Available"
-        else:
-            print(f"Meesho Scraper: Rating not found using attempted selectors: {rating_selectors_tried}")
-            product_data["rating"] = "Not Available"
-
-        # Scrape Details - UPDATED BASED ON PROVIDED HTML
-        product_data["details"] = []
-        
-        try:
-            # Primary method: Look for the product details container and extract all paragraphs
-            details_selector = (By.CSS_SELECTOR, ".ProductDescription__DetailsCardStyled-sc-1l1jg0i-0")
-            print(f"Meesho Scraper: Trying Details Selector: '.ProductDescription__DetailsCardStyled-sc-1l1jg0i-0'")
-            
-            details_container = wait.until(EC.presence_of_element_located(details_selector))
-            detail_paragraphs = details_container.find_elements(By.TAG_NAME, "p")
-            
-            if detail_paragraphs:
-                for p in detail_paragraphs:
-                    text = p.text.strip()
-                    if text and not text.startswith("More Information"):
-                        product_data["details"].append(text)
-                print(f"Meesho Scraper: Found {len(product_data['details'])} detail paragraphs")
-            else:
-                print("Meesho Scraper: No detail paragraphs found in container")
-                
-            # If no details found, try alternative selectors
-            if not product_data["details"]:
-                # Try XPath for paragraphs in product details section
-                try:
-                    xpath_selector = "//div[contains(@class, 'ProductDetails__Detail')]//p[contains(@class, 'Paragraph__StyledParagraph')]"
-                    print(f"Meesho Scraper: Trying alternative XPath: '{xpath_selector}'")
-                    detail_elements = driver.find_elements(By.XPATH, xpath_selector)
-                    for element in detail_elements:
-                        text = element.text.strip()
-                        if text:
-                            product_data["details"].append(text)
-                    print(f"Meesho Scraper: Found {len(product_data['details'])} details using XPath")
-                except Exception as e:
-                    print(f"Meesho Scraper: Error with XPath selector. Error: {e}")
-            
-            # If still no details, try the pre tags
-            if not product_data["details"]:
-                try:
-                    pre_selector = (By.CSS_SELECTOR, "pre.pre")
-                    print(f"Meesho Scraper: Trying pre tag selector: 'pre.pre'")
-                    pre_elements = driver.find_elements(pre_selector[0], pre_selector[1])
-                    for element in pre_elements:
-                        text = element.text.strip()
-                        if text:
-                            product_data["details"].append(text)
-                    print(f"Meesho Scraper: Found {len(product_data['details'])} details using pre tags")
-                except Exception as e:
-                    print(f"Meesho Scraper: Error with pre tag selector. Error: {e}")
-            
-            if not product_data["details"]:
-                print("Meesho Scraper: Could not find any product details using any method")
-        
-        except (TimeoutException, NoSuchElementException) as e:
-            print(f"Meesho Scraper: Details container not found or timed out. Error: {e}")
-            product_data["details"] = []
-
-        return product_data
-
-    except Exception as e:
-        if isinstance(e, WebDriverException):
-            print(f"Meesho Scraper Error: WebDriverException occurred: {e.msg}")
-        else:
-            print(f"Meesho Scraper Error: An unexpected error occurred: {e}")
-        try:
-            print(f"Page source at error (first 2000 chars):\n{driver.page_source[:2000]}")
-        except:
-            print("Could not retrieve page source after error.")
-        return None
-    finally:
-        if 'driver' in locals() and driver:
-            print("Meesho Scraper: Quitting driver.")
-            driver.quit()
-
-
-
-# Function to send email
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-import smtplib
-
-def send_email(receiver_email, subject, message):
-    sender_email = "sayutracker@gmail.com"
-    app_password = "rzmjlmldyyntsqiy"  # Keep secure
-
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
-        msg['To'] = receiver_email
-        msg['Subject'] = subject
-
-        # Attach plain text part with UTF-8 encoding
-        msg.attach(MIMEText(message, 'plain', 'utf-8'))
-
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
-        server.login(sender_email, app_password)
-        server.send_message(msg)
-        server.quit()
-        return True
-    except Exception as e:
-        print("Email sending failed:", e)
-        return False
-
-    
 @app.route("/")
 def home():
     return render_template("home1.html")
 
-@app.route("/track-page")
+@app.route("/track-page", methods=["GET", "POST"])
 def track_page():
-    return render_template("track.html")
-@app.route("/p-details")
-def p_details():
-    return render_template("pdetails.html")
-@app.route("/p-details", methods=["POST"])
-@app.route("/p-details", methods=["POST"])
-def get_product_details():
-    data1 = request.json
-    url1 = data1.get("productURL")
-    product_data = None
+    if request.method == "GET":
+        return render_template("track.html")
 
-    if "amazon" in url1:
-        product_data = scrape_amazon(url1)
-    elif "flipkart" in url1:
-        product_data = scrape_flipkart(url1)
-    elif "meesho" in url1:
-        product_data = scrape_meesho(url1)
-    elif "ajio" in url1:
-        product_data = scrape_ajio(url1)
-    elif "myntra" in url1:
-        product_data=scrape_myntra(url1)
+    if not current_user.is_authenticated:
+        return jsonify({"error": "You must be logged in to track prices."}), 401
 
-    if product_data:
-        return jsonify(product_data)
-    else:
-        return jsonify({"error": "Failed to fetch product details"}), 500
-
-    
-        
-    
-
-
-@app.route("/track-page", methods=["POST"])
-def track_price():
     data = request.json
     url = data.get("url")
-    target_price = float(data.get("price"))
-    receiver_email = data.get("email")
+    target_value = data.get("price")
+    alert_mode = data.get("mode", "absolute")
 
-    if not url or not target_price or not receiver_email:
+    if not url or not target_value:
         return jsonify({"error": "Missing required fields"}), 400
 
-    price = None
-    if "amazon" in url:
-        price_data = scrape_amazon(url)
-        if price_data:
-            price=price_data.get("price")
-    elif "ajio" in url:
-        price_data = scrape_ajio(url)
-        if price_data:
-            price=price_data.get("price")
-    elif "flipkart" in url:
-        price_data = scrape_flipkart(url)
-        if price_data:
-            price=price_data.get("price")
-    elif "meesho" in url:
-        price_data=scrape_meesho(url)
-        if price_data:
-            price=price_data.get("price")
-    elif "myntra" in url:
-        price_data=scrape_myntra(url)
-        if price_data:
-            price=price_data.get("price")
+    try:
+        target_value = float(target_value)
+    except ValueError:
+        return jsonify({"error": "Invalid target value"}), 400
+
+    logger.info(f"User {current_user.email} looking up {url} to track.")
+    scraped_data = scrape_product(url)
     
-    else:
-        return jsonify({"error": "Unsupported website"}), 400
-    
+    if not scraped_data or scraped_data.get('error') or scraped_data.get('price') is None:
+        return jsonify({"error": "Could not extract current price from the provided URL."}), 500
 
+    current_price = scraped_data['price']
+    product_name = scraped_data['name']
+    image_url = scraped_data.get('image_url', '')
 
-    if price:
-        product_name = price_data.get("name")
-        try:
-            with connect_db() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "INSERT INTO Sayu (Email, AlertPrice, URL, ProductName) VALUES (?, ?, ?, ?)",
-                    (receiver_email, target_price, url, product_name)
-                )
-                conn.commit()
-        except Exception as e:
-            print("Database Insert Error:", str(e))
-
-        if price <= target_price:
-            email_sent = send_email(receiver_email, "Price Drop Alert! 🎉", f"Hey there!  Good news from SAYU — the price of the product you're watching has dropped to ₹{price}. 🎯Hurry up and grab the deal before it's gone!. Buy now: {url}")
-            return jsonify({"message": "Price dropped! Email sent.", "price": price, "email_sent": email_sent})
+    try:
+        new_item = TrackedItem(
+            user_id=current_user.id,
+            url=url,
+            platform='auto',
+            product_name=product_name,
+            image_url=image_url,
+            alert_mode=alert_mode,
+            alert_target=target_value,
+            initial_price=current_price,
+            current_price=current_price,
+            lowest_price=current_price,
+            highest_price=current_price
+        )
+        db.session.add(new_item)
+        db.session.commit()
         
-        return jsonify({"message": "Price is still above target.", "price": price})
+        # Log initial price to history
+        new_history = PriceHistory(item_id=new_item.id, price=current_price)
+        db.session.add(new_history)
+        db.session.commit()
+
+        return jsonify({
+            "message": "Product tracking started successfully!", 
+            "product_name": product_name, 
+            "current_price": current_price
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Database Insert Error on track_page POST: {e}")
+        return jsonify({"error": "Failed to save tracking request"}), 500
+
+@app.route("/p-details", methods=["GET", "POST"])
+def p_details():
+    if request.method == "GET":
+        return render_template("pdetails.html")
+
+    data = request.json
+    url = data.get("productURL")
+
+    if not url:
+        return jsonify({"error": "No URL provided."}), 400
+
+    scraped_data = scrape_product(url)
+    if scraped_data and not scraped_data.get("error"):
+        return jsonify(scraped_data)
+    return jsonify({"error": scraped_data.get("error", "Failed to fetch product details.")}), 500
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    items = TrackedItem.query.filter_by(user_id=current_user.id).order_by(TrackedItem.created_at.desc()).all()
+    return render_template("dashboard.html", items=items)
+
+# --- REST API Controls ---
+
+@app.route("/api/items/<int:item_id>/pause", methods=["PATCH"])
+@login_required
+def pause_item(item_id):
+    item = TrackedItem.query.filter_by(id=item_id, user_id=current_user.id).first()
+    if item:
+        item.status = 'paused'
+        db.session.commit()
+        return jsonify({"status": "success", "message": "Tracker paused."})
+    return jsonify({"error": "Not Found"}), 404
+
+@app.route("/api/items/<int:item_id>/resume", methods=["PATCH"])
+@login_required
+def resume_item(item_id):
+    item = TrackedItem.query.filter_by(id=item_id, user_id=current_user.id).first()
+    if item:
+        item.status = 'active'
+        item.consecutive_errors = 0
+        db.session.commit()
+        return jsonify({"status": "success", "message": "Tracker resumed."})
+    return jsonify({"error": "Not Found"}), 404
+
+@app.route("/api/items/<int:item_id>", methods=["DELETE"])
+@login_required
+def delete_item(item_id):
+    item = TrackedItem.query.filter_by(id=item_id, user_id=current_user.id).first()
+    if item:
+        db.session.delete(item)
+        db.session.commit()
+        return jsonify({"status": "success", "message": "Tracker deleted."})
+    return jsonify({"error": "Not Found"}), 404
+
+@app.route("/api/items/<int:item_id>/history", methods=["GET"])
+@login_required
+def get_item_history(item_id):
+    item = TrackedItem.query.filter_by(id=item_id, user_id=current_user.id).first()
+    if not item:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    history = PriceHistory.query.filter_by(item_id=item_id).order_by(PriceHistory.checked_at.asc()).all()
+    result = [{"price": r.price, "date": r.checked_at} for r in history]
+    return jsonify(result)
+
+@app.route("/api/items/<int:item_id>/history.csv", methods=["GET"])
+@login_required
+def get_item_history_csv(item_id):
+    item = TrackedItem.query.filter_by(id=item_id, user_id=current_user.id).first()
+    if not item:
+        return jsonify({"error": "Unauthorized"}), 403
         
-    
-    return jsonify({"error": "Could not retrieve the price"}), 500
+    history = PriceHistory.query.filter_by(item_id=item_id).order_by(PriceHistory.checked_at.asc()).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Date Checked", "Price (INR)"])
+    for row in history:
+        writer.writerow([row.checked_at, row.price])
+
+    return Response(output.getvalue(), mimetype="text/csv", headers={"Content-Disposition": f"attachment;filename=history_{item_id}.csv"})
+
+@app.route("/unsubscribe/<int:item_id>", methods=["GET"])
+def unsubscribe(item_id):
+    item = TrackedItem.query.get(item_id)
+    if item:
+        item.status = 'paused'
+        db.session.commit()
+        return "<h3>Successfully Unsubscribed</h3><p>Your price tracker has been paused. You can resume it from your dashboard.</p>"
+    return "Not Found", 404
+
+@app.route("/health")
+def health_check():
+    return jsonify({"status": "healthy"})
+
+# --- Initialization Core ---
+init_db(app)
 
 if __name__ == "__main__":
+    # If we are running this file directly (local testing), start everything
+    start_scheduler(app)
     app.run(debug=True)

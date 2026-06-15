@@ -1,9 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logo Animation</title>
+    <title>SAYU - Loading...</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+
     <style>
         /* Body Styling */
         body {
@@ -11,14 +18,18 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
-            background-color: #f4f4f4;
+            background-color: #f8fafc;
+            /* Matches var(--bg-light) */
             margin: 0;
-            overflow: hidden; /* Prevent scrolling during animation */
+            overflow: hidden;
+            font-family: 'Poppins', sans-serif;
+            transition: opacity 0.5s ease;
         }
 
         /* Logo Container */
-        .logo-container {
+        .splash-container {
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             height: 100%;
@@ -26,41 +37,72 @@
 
         /* Image Styling */
         .logo-img {
-            width: 200px;
-            height: 200px;
-            border-radius: 50%; /* Ensures the image is always round */
-            object-fit: cover; /* Prevents distortion */
-            animation: animateTitle 2.5s ease-in-out forwards;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            object-fit: cover;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            animation: pulseIn 2s ease-in-out forwards;
+        }
+
+        .brand-text {
+            margin-top: 20px;
+            font-size: 2rem;
+            color: #2563eb;
+            /* Matches var(--primary-color) */
+            letter-spacing: 2px;
+            opacity: 0;
+            animation: fadeInText 1s ease forwards 0.5s;
         }
 
         /* Animation */
-        @keyframes animateTitle {
+        @keyframes pulseIn {
             0% {
-                transform: scale(1);
+                transform: scale(0.8);
                 opacity: 0;
             }
+
             50% {
-                transform: scale(1.5);
+                transform: scale(1.1);
                 opacity: 1;
             }
+
             100% {
                 transform: scale(1);
                 opacity: 1;
             }
         }
 
+        @keyframes fadeInText {
+            from {
+                transform: translateY(10px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
     </style>
 </head>
+
 <body>
-    <div class="logo-container">
-        <img src="https://i.postimg.cc/m2gW2M96/Whats-App-Image-2025-02-08-at-19-20-05-986fc138.jpg" class="logo-img" alt="Bell">
+    <div class="splash-container">
+        <img src="https://i.postimg.cc/m2gW2M96/Whats-App-Image-2025-02-08-at-19-20-05-986fc138.jpg" class="logo-img"
+            alt="SAYU Logo">
+        <div class="brand-text">SAYU</div>
     </div>
 
     <script>
-        setTimeout(function() {
-            document.querySelector('.logo-container').style.display = 'none';
-            window.location.href = 'home1.html'; 
-        }, 2500); // Redirect after 2.5 seconds
+        setTimeout(function () {
+            document.body.style.opacity = '0';
+            setTimeout(function () {
+                // Route to the Flask home route instead of static 'home1.html'
+                window.location.href = '/';
+            }, 500); // Wait for fade out to complete
+        }, 2200); // Wait for the entrance animations
     </script>
 </body>
+
 </html>

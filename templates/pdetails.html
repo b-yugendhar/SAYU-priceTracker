@@ -1,237 +1,274 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Product Price Tracker</title>
-    <style>
-    .product-image {
-            display: block; /* allows margin auto to center */
-            margin: 20px auto; /* center horizontally and add top spacing */
-            width: 200px; /* make it bigger */
-            height: 200px;
-            object-fit: contain;
-            border: 1px solid #ddd;
-            padding: 10px;
-            border-radius: 12px;
-            background-color: #fff;
-            box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
-        }
+    <title>Price Tracker - Product Details</title>
 
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Global CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+
+    <style>
         body {
-            font-family: 'Arial', sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: rgb(255, 255, 255);
             display: flex;
             flex-direction: column;
+            min-height: 100vh;
+        }
+
+        main {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
             align-items: center;
+            padding: 40px 20px;
         }
-        .container {
-            width: 50%;
-            background: rgb(221, 219, 219);
-            padding: 25px;
-            margin-top: 20px;
-            border-radius: 12px;
-            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+
+        .search-container {
+            background: var(--bg-white);
+            padding: 40px 30px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--card-shadow);
+            width: 100%;
+            max-width: 600px;
             text-align: center;
+            border: 1px solid #e2e8f0;
         }
-        input{
-            width: 75%;
-            padding: 10px;
-            border: 2px solid #007bff;
-            border-radius: 6px;
-            font-size: 16px;
+
+        .search-container h2 {
+            margin-bottom: 25px;
+            color: var(--text-dark);
+            font-size: 1.8rem;
+        }
+
+        .search-form {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .search-form input {
+            flex-grow: 1;
+            padding: 12px 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
             outline: none;
-            margin-top: 10px;
+            transition: var(--transition);
         }
-        button{
-            padding: 10px 15px;
-            background: #007bff;
-            color: white;
+
+        .search-form input:focus {
+            border-color: var(--primary-color);
+        }
+
+        .search-form button {
+            padding: 12px 25px;
+            border-radius: 8px;
             border: none;
-            border-radius: 6px;
-            font-size: 16px;
+            font-family: var(--font-heading);
+            font-size: 1rem;
             cursor: pointer;
-            transition: 0.3s ease-in-out;
-            margin-top: 10px;
         }
-        button:hover {
-            background: #0056b3;
-        }
+
         .product-image {
-            margin-top: 20px;
-            width: 150px;
-            height: 150px;
+            max-width: 250px;
+            max-height: 250px;
+            margin: 0 auto 30px;
             object-fit: contain;
-            border: 1px solid #ddd;
-            padding: 5px;
             border-radius: 8px;
             display: none;
         }
+
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
-            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
-        }
-        th, td {
-            padding: 12px;
             text-align: left;
-            border-bottom: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
         }
-        th {
-            background: #007bff;
-            color: white;
-        }
+
+        th,
         td {
-            background: #f9f9f9;
+            padding: 15px;
+            border-bottom: 1px solid #e2e8f0;
         }
-        .container1 {
-            background-color: #e9e9f0;
-    position: relative;
-    display: flex;
-    align-items: center;
-    height: 91.1px;
-    
-    justify-content: flex-start; /* Aligns content to the left */
-    font-family: Arial, sans-serif;
-    width: 100%; /* Ensures it stretches across the page */
-    padding: 20px; /* Adds spacing */
-}
 
-.icon {
-      width: 100px;
-      height: 100px;
-      background-color: rgb(255, 255, 255);
-      border-radius:50%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      margin-left: 35px;
-  }
-  .icon img {
-      width: 100px;
-      height: 100px;
-      border-radius: 50%;
-  }
-      
-  .text {
-      font-size: 48px;
-      font-weight: bold;
-      color: rgb(83, 141, 248); /* Light blue */
-      padding-left: 10px;
-  }
-  .faded-text {
-      position: absolute;
-      font-size: 48px;
-      color: rgba(135, 206, 250, 0.2);
-      left: 30px;
-      z-index: -1;
-  }
+        th {
+            background-color: #f1f5f9;
+            color: var(--text-dark);
+            font-weight: 600;
+            width: 30%;
+        }
 
-  #loadingOverlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background-color: rgba(255, 255, 255, 0.7);
-    z-index: 9999;
-    display: none; /* Hidden by default */
-    justify-content: center;
-    align-items: center;
-}
-#loadingOverlay img {
-    width: 145px;
-    height: 145px;
-}
+        td {
+            color: var(--text-muted);
+            background-color: var(--bg-white);
+        }
 
+        tr:last-child td,
+        tr:last-child th {
+            border-bottom: none;
+        }
 
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.8);
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .loading-overlay img {
+            width: 150px;
+            height: 150px;
+        }
     </style>
 </head>
-     <div id="loadingOverlay"  style="display: none;">
+
+<body>
+
+    <!-- Unified Header -->
+    <header class="animate__animated animate__fadeInDown">
+        <nav class="container">
+            <div class="logo-container">
+                <div class="icon">
+                    <img src="https://i.postimg.cc/m2gW2M96/Whats-App-Image-2025-02-08-at-19-20-05-986fc138.jpg"
+                        alt="SAYU Logo">
+                </div>
+                <div class="text">SAYU</div>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/">Home</a></li>
+                {% if current_user.is_authenticated %}
+                <li><a href="/track-page">Track a Product</a></li>
+                <li><a href="/dashboard">Dashboard</a></li>
+                <li><a href="{{ url_for('auth.logout') }}" style="color: #ef4444; font-weight: 600;">Logout</a></li>
+                {% else %}
+                <li><a href="/login" class="cta-btn primary-btn">Login / Sign Up</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="search-container animate__animated animate__fadeInUp">
+            <h2>🔎 Lookup Product Details</h2>
+            <div class="search-form">
+                <input type="text" id="productURL" placeholder="Paste Amazon, Flipkart, Myntra URL...">
+                <button class="cta-btn primary-btn" onclick="fetchProductDetails()">Search</button>
+            </div>
+
+            <img id="productImage" class="product-image animate__animated animate__fadeIn" src="" alt="Product Image">
+
+            <table id="productTable" style="display:none;" class="animate__animated animate__fadeInUp">
+                <tr>
+                    <th>Detail Type</th>
+                    <th>Value</th>
+                </tr>
+                <tr>
+                    <td>Name</td>
+                    <td id="productName">-</td>
+                </tr>
+                <tr>
+                    <td>Price</td>
+                    <td id="productPrice">-</td>
+                </tr>
+                <tr>
+                    <td>Details</td>
+                    <td id="productAvailability">-</td>
+                </tr>
+                <tr>
+                    <td>Rating</td>
+                    <td id="productRating">-</td>
+                </tr>
+            </table>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container footer-content text-center">
+            <p>&copy; <span id="year"></span> SAYU PriceTracker. All Rights Reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Loading overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
         <img src="https://i.postimg.cc/8Ck4wtsj/Animation-1745353486582.gif" alt="Loading...">
     </div>
-    
 
-      <div class="container1">
-        <div class="icon">
-            <img src="https://i.postimg.cc/m2gW2M96/Whats-App-Image-2025-02-08-at-19-20-05-986fc138.jpg" alt="Bell">
-        </div>
-       </div>
-    <div class="container">
-        <h2>🔎 Track Product details</h2>
-        <input type="text" id="productURL" placeholder="Enter product URL">
-        <button onclick="fetchProductDetails()">Search</button>
-        
-        <img id="productImage" class="product-image" src="" alt="Product Image">
-        
-        <table id="productTable" style="display:none;">
-            <tr><th>Detail</th><th>Value</th></tr>
-            <tr><td>Name</td><td id="productName">-</td></tr>
-            <tr><td>Price</td><td id="productPrice">-</td></tr>
-            <tr><td>Details</td><td id="productAvailability">-</td></tr>
-            <tr><td>Rating</td><td id="productRating">-</td></tr>
-        </table>
-    </div>
     <script>
-async function fetchProductDetails() {
-    let url = document.getElementById("productURL").value;
-    if (url.trim() === "") {
-        alert("Please enter a valid URL.");
-        return;
-    }
+        document.getElementById('year').textContent = new Date().getFullYear();
 
-    // Show loading overlay
-    const overlay = document.getElementById("loadingOverlay");
-    overlay.style.display = "flex";
+        async function fetchProductDetails() {
+            let url = document.getElementById("productURL").value;
+            if (url.trim() === "") {
+                alert("Please enter a valid URL.");
+                return;
+            }
 
-    // Hide previous data
-    document.getElementById("productImage").style.display = "none";
-    document.getElementById("productTable").style.display = "none";
+            const overlay = document.getElementById("loadingOverlay");
+            overlay.style.display = "flex";
 
-    try {
-        const response = await fetch("/p-details", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ productURL: url })
-        });
+            document.getElementById("productImage").style.display = "none";
+            document.getElementById("productTable").style.display = "none";
 
-        const data = await response.json();
+            try {
+                const response = await fetch("/p-details", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ productURL: url })
+                });
 
-        if (data.error) {
-            alert(data.error);
-            return;
+                const data = await response.json();
+
+                if (data.error) {
+                    alert(data.error);
+                    overlay.style.display = "none";
+                    return;
+                }
+
+                document.getElementById("productName").innerText = data.name || "-";
+                document.getElementById("productPrice").innerText = data.price ? `₹${data.price}` : "-";
+
+                let detailsText = "-";
+                if (data.details && data.details.length > 0) {
+                    detailsText = data.details.join(", ");
+                }
+                document.getElementById("productAvailability").innerText = detailsText;
+
+                document.getElementById("productRating").innerText = data.rating || "-";
+
+                let productImage = document.getElementById("productImage");
+                if (data.image_url && data.image_url !== "Not Available") {
+                    productImage.src = data.image_url;
+                    productImage.style.display = "block";
+                }
+
+                document.getElementById("productTable").style.display = "table";
+            } catch (err) {
+                alert("Something went wrong. Please try again.");
+                console.error(err);
+            } finally {
+                overlay.style.display = "none";
+            }
         }
-
-        document.getElementById("productName").innerText = data.name || "-";
-        document.getElementById("productPrice").innerText = data.price ? `₹${data.price}` : "-";
-        document.getElementById("productAvailability").innerText = data.details ? data.details.join(", ") : "-";
-        document.getElementById("productRating").innerText = data.rating || "-";
-
-        let productImage = document.getElementById("productImage");
-        if (data.image_url) {
-            productImage.src = data.image_url;
-            productImage.style.display = "block";
-        }
-
-        document.getElementById("productTable").style.display = "table";
-    } catch (err) {
-        alert("Something went wrong. Please try again.");
-        console.error(err);
-    } finally {
-        // Hide loading overlay
-        overlay.style.display = "none";
-    }
-}
-
-
-        </script>
-            
-    
-    
+    </script>
 </body>
+
 </html>

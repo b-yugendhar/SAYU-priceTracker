@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAYU - Dashboard</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .dashboard-container {
+            padding: 40px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .tracker-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+        }
+
+        .tracker-card {
+            background: var(--bg-white);
+            border-radius: var(--border-radius);
+            box-shadow: var(--card-shadow);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            transition: var(--transition);
+        }
+
+        .tracker-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-img {
+            width: 100%;
+            height: 200px;
+            object-fit: contain;
+        }
+
+        .card-title {
+            font-weight: 600;
+            color: var(--text-dark);
+            margin: 0;
+            font-size: 1.1rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-active {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-paused {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-triggered {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-error {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .price-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+
+        .price-stats div {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 150px;
+            margin: 10px 0;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 10px;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 15px;
+        }
+
+        .btn-sm {
+            flex: 1;
+            padding: 8px;
+            font-size: 0.9rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+
+        .btn-pause {
+            background: #2b3a4a;
+            color: white;
+        }
+
+        .btn-resume {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-delete {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-sm:hover {
+            opacity: 0.9;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px;
+            color: var(--text-muted);
+            grid-column: 1 / -1;
+        }
+    </style>
+</head>
+
+<body>
+    <header class="animate__animated animate__fadeInDown">
+        <nav class="container">
+            <div class="logo-container">
+                <div class="icon">
+                    <img src="https://i.postimg.cc/m2gW2M96/Whats-App-Image-2025-02-08-at-19-20-05-986fc138.jpg"
+                        alt="SAYU Logo">
+                </div>
+                <div class="text">SAYU</div>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/">Home</a></li>
+                <li><a href="/track-page">Track a Product</a></li>
+                <li><a href="{{ url_for('auth.logout') }}" style="color: #ef4444; font-weight: 600;">Logout</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="dashboard-container">
+        <div class="dashboard-header animate__animated animate__fadeIn">
+            <h2>My Trackers</h2>
+            <p>Welcome, {{ current_user.name }}</p>
+        </div>
+
+        <div class="tracker-grid">
+            {% if items|length == 0 %}
+            <div class="empty-state">
+                <h3>No items watched yet</h3>
+                <p>Start tracking a product to see it here!</p>
+                <br>
+                <a href="/track-page" class="cta-btn primary-btn">Go to Tracker Page</a>
+            </div>
+            {% endif %}
+
+            {% for item in items %}
+            <div class="tracker-card animate__animated animate__zoomIn" id="item-{{ item.id }}">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <span class="badge badge-{{ item.status }}">{{ item.status }}</span>
+                    <a href="{{ item.url }}" target="_blank"
+                        style="font-size: 0.8rem; color: var(--primary-color); text-decoration: underline;">Visit</a>
+                </div>
+
+                {% if item.image_url and item.image_url != 'Not Available' %}
+                <img src="{{ item.image_url }}" alt="Product" class="card-img">
+                {% endif %}
+
+                <h3 class="card-title" title="{{ item.product_name }}">{{ item.product_name }}</h3>
+
+                <div class="price-stats">
+                    <div>
+                        <span class="stat-label">Current</span>
+                        <span class="stat-value">₹{{ item.current_price }}</span>
+                    </div>
+                    <div>
+                        <span class="stat-label">Target ({{ item.alert_mode }})</span>
+                        <span class="stat-value" style="color: var(--secondary-color);">
+                            {% if item.alert_mode == 'percentage' %}
+                            {{ item.alert_target * 100 }}% drop
+                            {% else %}
+                            ₹{{ item.alert_target }}
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="price-stats">
+                    <div>
+                        <span class="stat-label">Lowest</span>
+                        <span class="stat-value" style="color: #059669;">₹{{ item.lowest_price if item.lowest_price else
+                            '-' }}</span>
+                    </div>
+                    <div>
+                        <span class="stat-label">Highest</span>
+                        <span class="stat-value" style="color: #dc2626;">₹{{ item.highest_price if item.highest_price
+                            else '-' }}</span>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="chart-{{ item.id }}"></canvas>
+                </div>
+
+                <div class="card-actions">
+                    {% if item.status == 'active' or item.status == 'triggered' %}
+                    <button class="btn-sm btn-pause" onclick="patchItem({{ item.id }}, 'pause')">Pause</button>
+                    {% elif item.status == 'paused' or item.status == 'error' %}
+                    <button class="btn-sm btn-resume" onclick="patchItem({{ item.id }}, 'resume')">Resume</button>
+                    {% endif %}
+                    <a href="/api/items/{{ item.id }}/history.csv" class="btn-sm"
+                        style="background:#10b981; color:white; text-align:center; text-decoration:none; display:inline-block; box-sizing:border-box;">Export
+                        CSV</a>
+                    <button class="btn-sm btn-delete" onclick="deleteItem({{ item.id }})">Delete</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </main>
+
+    <script>
+        // Fetch and render historical prices dynamically
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.tracker-card');
+            cards.forEach(async (card) => {
+                const itemId = card.id.split('-')[1];
+                const canvas = document.getElementById(`chart-${itemId}`);
+                if (!canvas) return;
+
+                try {
+                    const response = await fetch(`/api/items/${itemId}/history`);
+                    const data = await response.json();
+
+                    if (data && !data.error && data.length > 0) {
+                        const labels = data.map(d => new Date(d.date).toLocaleDateString());
+                        const prices = data.map(d => d.price);
+
+                        new Chart(canvas, {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'Price History',
+                                    data: prices,
+                                    borderColor: '#4F46E5',
+                                    backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                                    tension: 0.3,
+                                    fill: true,
+                                    pointRadius: 2
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { display: false } },
+                                scales: { x: { display: false }, y: { ticks: { font: { size: 10 } } } }
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.error("Failed to load chart for " + itemId, e);
+                }
+            });
+        });
+
+        // REST Control Handlers
+        async function patchItem(itemId, action) {
+            try {
+                const res = await fetch(`/api/items/${itemId}/${action}`, { method: 'PATCH' });
+                if (res.ok) { window.location.reload(); }
+            } catch (e) { alert("Failed to update status."); }
+        }
+
+        async function deleteItem(itemId) {
+            if (!confirm("Are you sure you want to completely delete this tracking alert?")) return;
+            try {
+                const res = await fetch(`/api/items/${itemId}`, { method: 'DELETE' });
+                if (res.ok) {
+                    document.getElementById(`item-${itemId}`).remove();
+                }
+            } catch (e) { alert("Failed to delete."); }
+        }
+    </script>
+</body>
+
+</html>

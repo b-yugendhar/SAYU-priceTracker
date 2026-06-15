@@ -1,163 +1,197 @@
 <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <title>Price Tracker - Homepage</title>
-            <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">   
-           <style>
-            <!DOCTYPE html>
-       <html lang="en">
-       <head>
+<html lang="en">
+
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Styled Text and Icon</title>
-    <style>
-    body {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-        background-color: #f5f5f5;
-    }
-    .container {
-        position: relative;
-        display: flex;
-        align-items: center;
-        font-family: Arial, sans-serif;
-    }
-    .icon {
-        width: 50px;
-        height: 50px;
-        background-color: rgba(10000, 0, 0, 0.5);
-        border-radius: 50%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        position: relative;
-    }
-    .icon img {
-        width: 100px;
-        height: 100px;
-        border-radius:50%;
-    }
-    .text {
-        font-size: 48px;
-        font-weight: bold;
-        color: rgb(83, 73, 73); 
-        margin-left: 40px;
-        font-family: 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
-    }
-    .faded-text {
-        position: absolute;
-        font-size: 48px;
-        color: rgba(135, 206, 250, 0.2);
-        left: 30px;
-        z-index: -1;
-    }
-</style>     
-        </head>
-        <body>
-            <header class="animate__animated animate__fadeIn">
-                <nav>
-                    <div class="container">
-                        <div class="icon">
-                            <img src="https://i.postimg.cc/m2gW2M96/Whats-App-Image-2025-02-08-at-19-20-05-986fc138.jpg" alt="Bell">
-                        </div>
-                        <div class="text">SAYU</div>
-                      
+    <title>Price Tracker - Homepage</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Main Stylesheet (Flask) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <!-- Animate.css for the animation classes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="animate__animated animate__fadeInDown">
+        <nav class="container">
+            <div class="logo-container">
+                <div class="icon">
+                    <img src="https://i.postimg.cc/m2gW2M96/Whats-App-Image-2025-02-08-at-19-20-05-986fc138.jpg"
+                        alt="SAYU Logo">
+                </div>
+                <div class="text">SAYU</div>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/">Home</a></li>
+                {% if current_user.is_authenticated %}
+                <li><a href="/track-page">Track a Product</a></li>
+                <li><a href="/dashboard">Dashboard</a></li>
+                <li><a href="{{ url_for('auth.logout') }}" style="color: #ef4444; font-weight: 600;">Logout</a></li>
+                {% else %}
+                <li><a href="/login" class="cta-btn primary-btn">Login / Sign Up</a></li>
+                {% endif %}
+                <li><a href="#how-it-works">How It Works</a></li>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#faq">FAQ</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Hero Section -->
+        <section class="hero animate__animated animate__fadeIn animate__delay-1s">
+            <div class="hero-content container">
+                <h2>Track Your Favorite Products</h2>
+                <p>Never overpay again. Get instant alerts when prices drop! Stay updated on the best deals across
+                    multiple leading e-commerce platforms.</p>
+                <div class="hero-buttons">
+                    <a href="/track-page"
+                        class="cta-btn primary-btn animate__animated animate__pulse animate__infinite">Start Tracking
+                        Now</a>
+                    <a href="/p-details" class="cta-btn secondary-btn">Get Product Details</a>
+                </div>
+            </div>
+            <div class="hero-bg-overlay"></div>
+        </section>
+
+        <!-- Supported Brands (Scrolling Images) -->
+        <section class="scrolling-images">
+            <h3 class="section-subtitle">Supported Platforms</h3>
+            <div class="image-wrapper">
+                <img src="https://i.pinimg.com/originals/01/ca/da/01cada77a0a7d326d85b7969fe26a728.jpg" alt="Amazon">
+                <img src="https://seeklogo.com/images/F/flipkart-logo-3F33927DAA-seeklogo.com.png" alt="Flipkart">
+                <img src="https://img.utdstc.com/icon/b7e/c6b/b7ec6bcad19a722c6f27fb3297d7ae074982d7915c421d541f5e07072fe654a9:100"
+                    alt="Ajio">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/3/33/Meesho_logo.png" alt="Meesho">
+                <img src="https://www.payuoc.com/wp-content/uploads/2020/02/myntra-702x526.jpg" alt="Myntra">
+                <!-- Duplicates for seamless scrolling -->
+                <img src="https://i.pinimg.com/originals/01/ca/da/01cada77a0a7d326d85b7969fe26a728.jpg" alt="Amazon">
+                <img src="https://seeklogo.com/images/F/flipkart-logo-3F33927DAA-seeklogo.com.png" alt="Flipkart">
+                <img src="https://img.utdstc.com/icon/b7e/c6b/b7ec6bcad19a722c6f27fb3297d7ae074982d7915c421d541f5e07072fe654a9:100"
+                    alt="Ajio">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/3/33/Meesho_logo.png" alt="Meesho">
+                <img src="https://www.payuoc.com/wp-content/uploads/2020/02/myntra-702x526.jpg" alt="Myntra">
+            </div>
+        </section>
+
+        <!-- How it works -->
+        <section id="how-it-works" class="how-it-works padding-section">
+            <div class="container text-center">
+                <h2 class="section-title">How It Works</h2>
+                <div class="steps-grid">
+                    <div class="step-card">
+                        <div class="step-icon">1</div>
+                        <h3>Find the Product</h3>
+                        <p>Browse Amazon, Flipkart, Myntra, etc., and copy the URL of the product you want.</p>
                     </div>
-                    <ul class="nav-links">
-                        <li><a href="#">Home</a></li>
-                        <li><a href="#">Dashboard</a></li>
-                        <li><a href="#">Contact</a></li>
-                    </ul>
-                </nav>
-            </header>
-            <section class="hero animate__animated animate__fadeIn animate__delay-1s">
-                <div class="hero-content">
-                    <h2>Track Your Favorite Products</h2>
-                    <p>Get alerts when prices drop! Stay updated on the best deals across multiple e-commerce platforms.</p>
-                    <a href="#" id="startTracking" class="cta-btn animate__animated animate__pulse animate__infinite">Start Tracking Now</a>
-                    <a href="#" id="productDetails" class="cta-btn animate__animated animate__pulse animate__infinite">Get Product Details</a>
+                    <div class="step-card">
+                        <div class="step-icon">2</div>
+                        <h3>Set Your Target</h3>
+                        <p>Paste the URL on our tracker page and enter your desired target price.</p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-icon">3</div>
+                        <h3>Get Notified</h3>
+                        <p>Relax! We'll send an email alert to you the moment the price drops.</p>
+                    </div>
                 </div>
-            </section>
-            <section class="scrolling-images">
-                <div class="image-wrapper">
-                    <img src="https://i.pinimg.com/originals/01/ca/da/01cada77a0a7d326d85b7969fe26a728.jpg" alt="amazon">
-                    <img src="https://seeklogo.com/images/F/flipkart-logo-3F33927DAA-seeklogo.com.png" alt="flipkart">
-                    <img src="https://img.utdstc.com/icon/b7e/c6b/b7ec6bcad19a722c6f27fb3297d7ae074982d7915c421d541f5e07072fe654a9:100" alt="ajio">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/3/33/Meesho_logo.png" alt="meesho">
-                    <img src="https://www.payuoc.com/wp-content/uploads/2020/02/myntra-702x526.jpg" alt="myntra">
-                    <img src="https://i.pinimg.com/originals/01/ca/da/01cada77a0a7d326d85b7969fe26a728.jpg" alt="amazon">
-                    <img src="https://seeklogo.com/images/F/flipkart-logo-3F33927DAA-seeklogo.com.png" alt="flipkart">
-                    <img src="https://img.utdstc.com/icon/b7e/c6b/b7ec6bcad19a722c6f27fb3297d7ae074982d7915c421d541f5e07072fe654a9:100" alt="ajio">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/3/33/Meesho_logo.png" alt="meesho">
-                    <img src="https://i.pinimg.com/originals/01/ca/da/01cada77a0a7d326d85b7969fe26a728.jpg" alt="amazon">
-                    <img src="https://seeklogo.com/images/F/flipkart-logo-3F33927DAA-seeklogo.com.png" alt="flipkart">
-                    <img src="https://img.utdstc.com/icon/b7e/c6b/b7ec6bcad19a722c6f27fb3297d7ae074982d7915c421d541f5e07072fe654a9:100" alt="ajio">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/3/33/Meesho_logo.png" alt="meesho">
-                    <img src="https://www.payuoc.com/wp-content/uploads/2020/02/myntra-702x526.jpg" alt="myntra">
-                    <img src="https://i.pinimg.com/originals/01/ca/da/01cada77a0a7d326d85b7969fe26a728.jpg" alt="amazon">
-                    <img src="https://seeklogo.com/images/F/flipkart-logo-3F33927DAA-seeklogo.com.png" alt="flipkart">
-                    <img src="https://img.utdstc.com/icon/b7e/c6b/b7ec6bcad19a722c6f27fb3297d7ae074982d7915c421d541f5e07072fe654a9:100" alt="ajio">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/3/33/Meesho_logo.png" alt="meesho">
-                    
-                    
+            </div>
+        </section>
+
+        <!-- Features -->
+        <section id="features" class="features padding-section glass-bg">
+            <div class="container">
+                <h2 class="section-title text-center">App Features</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🔔</div>
+                        <h3>Real-Time Alerts</h3>
+                        <p>Get notified instantly via email when prices drop on your desired products.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📊</div>
+                        <h3>Easy Interface</h3>
+                        <p>Input URLs easily and track without any hassle. Access product details seamlessly.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🌐</div>
+                        <h3>Cross-Site Tracking</h3>
+                        <p>Track from top e-commerce websites (Amazon, Flipkart, Myntra, Ajio, Meesho) from a single
+                            place.</p>
+                    </div>
                 </div>
-            </section>
-            <section id="features"class="features animate__animate animate__fadeIn animate__delay-2s">
-                <div class="feature">
-                    <h3>Real-Time Price Alerts</h3>
-                    <p>Get notified instantly when prices drop on your desired products.</p>
+            </div>
+        </section>
+
+        <!-- Benefits -->
+        <section id="benefits" class="benefits padding-section">
+            <div class="container text-center">
+                <h2 class="section-title">Why Choose Us?</h2>
+                <p class="section-description">Join our platform and unlock a smarter way to shop.</p>
+                <div class="benefits-grid">
+                    <div class="benefit-card">
+                        <h3>Save Money</h3>
+                        <p>We ensure that you always get the best deals and save money with accurate price tracking
+                            alerts.</p>
+                    </div>
+                    <div class="benefit-card">
+                        <h3>User Friendly</h3>
+                        <p>Our fast, modern platform is simple and intuitive, making it easy for anyone to start
+                            tracking instantly.</p>
+                    </div>
+                    <div class="benefit-card">
+                        <h3>Secure & Private</h3>
+                        <p>Your email and tracking list are safe. We only send notifications for the items you care
+                            about.</p>
+                    </div>
                 </div>
-                <div class="feature">
-                    <h3>Historical Data</h3>
-                    <p>View detailed price history and make informed buying decisions.</p>
+            </div>
+        </section>
+
+        <!-- FAQ -->
+        <section id="faq" class="faq padding-section bg-light">
+            <div class="container">
+                <h2 class="section-title text-center">Frequently Asked Questions</h2>
+                <div class="faq-list">
+                    <details class="faq-item">
+                        <summary>Is the service free to use?</summary>
+                        <p>Yes, our tool is 100% free for everyone. You can track as many product links as you like!</p>
+                    </details>
+                    <details class="faq-item">
+                        <summary>Which websites are supported currently?</summary>
+                        <p>Currently, SAYU supports tracking products from Amazon India, Flipkart, Myntra, Ajio, and
+                            Meesho.</p>
+                    </details>
+                    <details class="faq-item">
+                        <summary>How will I know when the price drops?</summary>
+                        <p>We will send a real-time alert via email to the address you provided during the tracking
+                            setup.</p>
+                    </details>
                 </div>
-                <div class="feature">
-                    <h3>Cross-Site Compatibility</h3>
-                    <p>Track products from multiple e-commerce websites all in one place.</p>
-                </div>
-            </section>
-            <section id="benefits" class="benefits">
-                <h2>Why Choose Us?</h2>
-                <img src="https://cdn3.iconfinder.com/data/icons/business-vol-20/100/Artboard_20-512.png" alt="benefits" width="10%"/>
-                <div class="benefit" class="image1">
-                    <h3>Save Money</h3>
-                    <p>We ensure that you always get the best deals and save money with the price tracking alerts.</p>
-                </div>
-                <div class="benefit">
-                    <h3>Easy to Use</h3>
-                    <p>Our platform is simple and intuitive, making it easy for anyone to start tracking their favorite products.</p>
-                </div>
-                <div class="benefit">
-                    <h3>Multiple Platforms</h3>
-                    <p>Track products across multiple e-commerce platforms like Amazon, Flipkart, and others, all in one place.</p>
-                </div>
-            </section>
-        
-         
-            <footer class="animate__animated animate__fadeIn animate__delay-3s">
-                <p>&copy; 2025 PriceTracker. All Rights Reserved.</p>
-            </footer>
-            <script>
-                function navigateToProductDetails() {
-                    window.location.href = 'pdetails.html';
-                }
-            </script>
-            
-            <script>
-                document.getElementById('startTracking').addEventListener('click', function (e) {
-                    e.preventDefault();
-                    window.location.href = '/track-page';
-                });
-                document.getElementById('productDetails').addEventListener('click', function (e) {
-                    e.preventDefault();
-                    window.location.href = '/p-details';
-                });
-            </script>
-           </footer>
-        
- 
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container footer-content text-center">
+            <p>&copy; <span id="year"></span> SAYU PriceTracker. All Rights Reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        document.getElementById('year').textContent = new Date().getFullYear();
     </script>
 </body>
+
 </html>
