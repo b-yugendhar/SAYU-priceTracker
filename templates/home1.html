@@ -12,16 +12,11 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap"
         rel="stylesheet">
-
-    <!-- Main Stylesheet (Flask) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-
-    <!-- Animate.css for the animation classes -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
 </head>
 
 <body>
-    <!-- Header -->
     <header class="animate__animated animate__fadeInDown">
         <nav class="container">
             <div class="logo-container">
@@ -48,7 +43,6 @@
     </header>
 
     <main>
-        <!-- Hero Section -->
         <section class="hero animate__animated animate__fadeIn animate__delay-1s">
             <div class="hero-content container">
                 <h2>Track Your Favorite Products</h2>
@@ -63,8 +57,6 @@
             </div>
             <div class="hero-bg-overlay"></div>
         </section>
-
-        <!-- Supported Brands (Scrolling Images) -->
         <section class="scrolling-images">
             <h3 class="section-subtitle">Supported Platforms</h3>
             <div class="image-wrapper">
@@ -74,7 +66,6 @@
                     alt="Ajio">
                 <img src="https://upload.wikimedia.org/wikipedia/commons/3/33/Meesho_logo.png" alt="Meesho">
                 <img src="https://www.payuoc.com/wp-content/uploads/2020/02/myntra-702x526.jpg" alt="Myntra">
-                <!-- Duplicates for seamless scrolling -->
                 <img src="https://i.pinimg.com/originals/01/ca/da/01cada77a0a7d326d85b7969fe26a728.jpg" alt="Amazon">
                 <img src="https://seeklogo.com/images/F/flipkart-logo-3F33927DAA-seeklogo.com.png" alt="Flipkart">
                 <img src="https://img.utdstc.com/icon/b7e/c6b/b7ec6bcad19a722c6f27fb3297d7ae074982d7915c421d541f5e07072fe654a9:100"
@@ -84,7 +75,6 @@
             </div>
         </section>
 
-        <!-- How it works -->
         <section id="how-it-works" class="how-it-works padding-section">
             <div class="container text-center">
                 <h2 class="section-title">How It Works</h2>
@@ -108,7 +98,6 @@
             </div>
         </section>
 
-        <!-- Features -->
         <section id="features" class="features padding-section glass-bg">
             <div class="container">
                 <h2 class="section-title text-center">App Features</h2>
@@ -133,7 +122,6 @@
             </div>
         </section>
 
-        <!-- Benefits -->
         <section id="benefits" class="benefits padding-section">
             <div class="container text-center">
                 <h2 class="section-title">Why Choose Us?</h2>
@@ -158,7 +146,6 @@
             </div>
         </section>
 
-        <!-- FAQ -->
         <section id="faq" class="faq padding-section bg-light">
             <div class="container">
                 <h2 class="section-title text-center">Frequently Asked Questions</h2>
@@ -182,7 +169,6 @@
         </section>
     </main>
 
-    <!-- Footer -->
     <footer>
         <div class="container footer-content text-center">
             <p>&copy; <span id="year"></span> SAYU PriceTracker. All Rights Reserved.</p>

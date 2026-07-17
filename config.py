@@ -12,5 +12,6 @@ class Config:
     SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
     SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
     WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
+    
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", "sqlite:///database.db")
     SQLALCHEMY_TRACK_MODIFICATIONS = False

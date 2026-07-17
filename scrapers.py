@@ -83,25 +83,21 @@ def init_driver():
 
 @retry_with_backoff(retries=3)
 def scrape_amazon(url):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/114.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "DNT": "1",
-        "Upgrade-Insecure-Requests": "1"
-    }
-
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"}
     product_data = { "name": None, "price": None, "rating": None, "details": [], "image_url": None }
     try:
-        response = requests.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.content, "html.parser")
+        r = requests.get(url, headers=headers, timeout=15)
+        r.raise_for_status()
+        soup = BeautifulSoup(r.content, "html.parser")
 
         name_elem = soup.select_one("#productTitle")
         if name_elem: product_data["name"] = name_elem.text.strip()
 
-        price_elem = soup.select_one("span.a-price-whole") or soup.select_one("span.a-price .a-offscreen")
+        # Using user's tested selector
+        price_elem = (
+            soup.select_one("span.a-price-whole")
+            or soup.select_one(".a-price .a-offscreen")
+        )
         if price_elem:
             price_text = price_elem.text.replace('₹', '').replace(',', '').strip()
             price_match = re.search(r'\d+\.?\d*', price_text)
@@ -120,39 +116,33 @@ def scrape_amazon(url):
     except Exception as e:
         raise e
 
+
 @retry_with_backoff(retries=2)
 def scrape_flipkart(url):
-    driver = init_driver()
+    # Using User's requests approach which is much faster than Selenium
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"}
     product_data = { "name": None, "price": None, "rating": "Not Available", "details": [], "image_url": "Not Available" }
     try:
-        driver.get(url)
-        wait = WebDriverWait(driver, 15)
-        name_elem = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "span.VU-ZEz")))
-        product_data["name"] = name_elem.text.strip()
+        r = requests.get(url, headers=headers, timeout=15)
+        soup = BeautifulSoup(r.content, features="html.parser")  # changed to html.parser to avoid missing lxml dependency
+        
+        name_elem = soup.select_one("span.VU-ZEz")
+        if name_elem: product_data["name"] = name_elem.text.strip()
 
-        price_elem = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "div.Nx9bqj")))
-        price_text = price_elem.text.replace('₹', '').replace(',', '').strip()
-        price_match = re.search(r'\d+\.?\d*', price_text)
-        if price_match: product_data["price"] = float(price_match.group())
+        # User's exact tested class selector
+        price_element = soup.find("div", class_="Nx9bqj CxhGGd")
+        if price_element:
+            price_text = price_element.text.replace('₹', '').replace(',', '').strip()
+            price_match = re.search(r'\d+\.?\d*', price_text)
+            if price_match: product_data["price"] = float(price_match.group())
 
-        try:
-            rating_elem = driver.find_element(By.CSS_SELECTOR, "div.XQDdHH")
-            product_data["rating"] = rating_elem.text.strip()
-        except: pass
-
-        try:
-            items = driver.find_elements(By.CSS_SELECTOR, "li._7eSDEz")
-            product_data["details"] = [item.text.strip() for item in items if item.text.strip()]
-        except: pass
-
-        try:
-            img_elem = driver.find_element(By.CSS_SELECTOR, "img.DByuf4, img.IZexXJ")
-            product_data["image_url"] = img_elem.get_attribute("src")
-        except: pass
+        img_elem = soup.select_one("img.DByuf4, img.IZexXJ")
+        if img_elem: product_data["image_url"] = img_elem.get("src")
         
         return product_data
-    finally:
-        driver.quit()
+    except Exception as e:
+        raise e
+
 
 @retry_with_backoff(retries=2)
 def scrape_myntra(url):
@@ -171,14 +161,10 @@ def scrape_myntra(url):
         price_match = re.search(r'\d+\.?\d*', price_text)
         if price_match: product_data["price"] = float(price_match.group())
         
-        try:
-            rating_elem = driver.find_element(By.CSS_SELECTOR, ".index-ratingsValue")
-            product_data["rating"] = rating_elem.text.strip()
-        except: pass
-
         return product_data
     finally:
         driver.quit()
+
 
 @retry_with_backoff(retries=2)
 def scrape_ajio(url):
@@ -186,11 +172,31 @@ def scrape_ajio(url):
     product_data = { "name": None, "price": None, "rating": "Not Available", "details": [], "image_url": "Not Available" }
     try:
         driver.get(url)
-        wait = WebDriverWait(driver, 15)
-        name_elem = wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "prod-name")))
-        product_data["name"] = name_elem.text.strip()
+        # Applying user's tested implicit sleep mechanisms
+        import time
+        time.sleep(5)
+        
+        try:
+            name_elem = driver.find_element(By.CLASS_NAME, "prod-name")
+            product_data["name"] = name_elem.text.strip()
+        except: pass
 
-        price_elem = driver.find_element(By.CLASS_NAME, "prod-sp")
+        price_selectors = [
+            ".price .price",
+            ".prod-sp",
+            "[class*='price']",
+            "span[class*='Price']"
+        ]
+
+        price_elem = None
+
+        for selector in price_selectors:
+            try:
+                price_elem = driver.find_element(By.CSS_SELECTOR, selector)
+                if price_elem.text.strip():
+                    break
+            except:
+                pass
         price_text = price_elem.text.replace('₹', '').replace(',', '').strip()
         price_match = re.search(r'\d+\.?\d*', price_text)
         if price_match: product_data["price"] = float(price_match.group())
@@ -198,6 +204,7 @@ def scrape_ajio(url):
         return product_data
     finally:
         driver.quit()
+
 
 @retry_with_backoff(retries=2)
 def scrape_meesho(url):
@@ -215,6 +222,52 @@ def scrape_meesho(url):
         if price_match: product_data["price"] = float(price_match.group())
 
         return product_data
+    finally:
+        driver.quit()
+
+
+@retry_with_backoff(retries=2)
+def scrape_bestbuy(url):
+    # Added based on user's provided logic
+    driver = init_driver()
+    product_data = { "name": "BestBuy Product", "price": None, "rating": "Not Available", "details": [], "image_url": "Not Available" }
+    try:
+        driver.get("https://www.bestbuy.com/")
+        import time
+        time.sleep(2)
+
+        driver.add_cookie({
+            "name": "intl_splash",
+            "value": "true",
+            "domain": ".bestbuy.com"
+        })
+        logger.info("Cookie set to bypass location selection.")
+
+        url = url.replace("www.bestbuy.com", "www.bestbuy.com/site")
+        driver.get(url)
+        time.sleep(5)
+
+        driver.execute_script("window.scrollBy(0, 500);")
+        time.sleep(2)
+
+        wait = WebDriverWait(driver, 15)
+        price_element = wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, 'div.priceView-hero-price.priceView-customer-price span[aria-hidden="true"]'))
+        )
+        
+        price_text = price_element.text.strip()
+        price_match = re.search(r'\d+\.?\d*', price_text.replace("$", "").replace(",", ""))
+        if price_match: product_data["price"] = float(price_match.group())
+        
+        # Scrape name if available
+        try:
+            name_elem = driver.find_element(By.CSS_SELECTOR, "h1.heading-5")
+            if name_elem: product_data["name"] = name_elem.text.strip()
+        except: pass
+
+        return product_data
+    except Exception as e:
+        raise e
     finally:
         driver.quit()
 
@@ -244,6 +297,8 @@ def scrape_product(url):
         result = scrape_ajio(url)
     elif 'meesho' in domain:
         result = scrape_meesho(url)
+    elif 'bestbuy' in domain:
+        result = scrape_bestbuy(url)
     else:
         logger.warning(f"Unsupported URL domain provided: {domain}")
         return {"error": "Unsupported platform."}

@@ -15,7 +15,6 @@ def patch_templates():
         
         # Redundant patches if any existed
         content = content.replace('auth.auth.', 'auth.')
-        
         with open(f, 'w', encoding='utf-8') as file:
             file.write(content)
             

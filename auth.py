@@ -13,6 +13,10 @@ def register():
         email = request.form.get('email')
         password = request.form.get('password')
 
+        if not password or len(password) < 8:
+            flash('Password must be at least 8 characters long.', 'error')
+            return redirect(url_for('auth.register'))
+
         user = User.query.filter_by(email=email).first()
         if user:
             flash('Email address already exists', 'error')

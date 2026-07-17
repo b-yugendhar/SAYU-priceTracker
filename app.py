@@ -27,7 +27,6 @@ limiter = Limiter(
     storage_uri="memory://"
 )
 
-# Register Blueprints
 app.register_blueprint(auth_bp)
 
 # Configure Flask-Login
@@ -40,8 +39,7 @@ login_manager.login_message_category = 'error'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# --- Routing ---
-
+#routing
 @app.route("/")
 def home():
     return render_template("home1.html")
@@ -53,12 +51,10 @@ def track_page():
 
     if not current_user.is_authenticated:
         return jsonify({"error": "You must be logged in to track prices."}), 401
-
     data = request.json
     url = data.get("url")
     target_value = data.get("price")
     alert_mode = data.get("mode", "absolute")
-
     if not url or not target_value:
         return jsonify({"error": "Missing required fields"}), 400
 
@@ -212,4 +208,4 @@ init_db(app)
 if __name__ == "__main__":
     # If we are running this file directly (local testing), start everything
     start_scheduler(app)
-    app.run(debug=True)
+    app.run(debug=True, use_reloader=False)
